@@ -36,7 +36,8 @@ do
             then
                 continue
             fi
-            echo id=$id ecu=$ecu=$vcpu*$ecus_per_vcpu mem=$mem epher=$epher
+            echo id=$id ecu=$ecu=$vcpu*$ecus_per_vcpu mem=$mem epher=$epher ecus_per_vcpu=$ecus_per_vcpu >> flavor.log
+
             echo nova flavor-create flavor_${id} $flavor_id $mem $local_disk $vcpu --ephemeral $epher
             nova flavor-create flavor_${id} $flavor_id $mem $local_disk $vcpu --ephemeral $epher
             echo nova-manage flavor set_key --name flavor_${id} --key ecus_per_vcpu: --value $ecus_per_vcpu
