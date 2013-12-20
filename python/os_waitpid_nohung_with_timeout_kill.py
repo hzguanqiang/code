@@ -5,54 +5,51 @@ import time
 
 
 def runcmd(cmd, timeout=5):
-    ret = -2
     argv = cmd.split()
+    print "enter runcmd"
     pid = os.fork()
     if pid == 0:
         os.execv(argv[0], argv)
-        sys.exit(1)
+        os._exit(0)
     else:
         os.waitpid(pid, 0)
-        ret = 0
-        return ret
 
-
-def handle_sigchld(signum, frame):
-    try:
-        pid, status = os.waitpid(-1, 0)
-    except OSError:
-        pass
+    print "leave runcmd"
 
 
 def test(cmd):
-    os.system("echo `date` test begin")
+    print "test begin"
     pid = os.fork()
     if pid == 0:
-        os.system("echo `date` test ------enter child")
+        print "enter child"
         runcmd(cmd)
-        os.system("echo `date` test ------leave child")
-        sys.exit(1)
+        print "leave child"
+        os._exit(0)
+        print "child exit"
     else:
-        signal.signal(signal.SIGCHLD, handle_sigchld)
         print "pid : %s" % pid
-        timeout = 50
+        timeout = 30
         runtime = 0
         overtime = True
         while runtime < timeout:
-            time.sleep(0.1)
-            runtime += 0.1
+            os.waitpid(pid, os.WNOHANG)
             pidfile = "/proc/%s" % pid
             if not os.path.exists(pidfile):
                 print "pidfile %s  not exist, pid have exited" % pidfile
                 overtime = False
                 break
+            time.sleep(0.1)
+            runtime += 0.1
+            print "runtime: %s" % runtime
         if overtime:
-            print "50s timeout and kill %s" % pid
+            print "30s timeout and kill %s" % pid
             os.kill(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
 
-    os.system("echo `date` test end")
+    print "test end"
 
 
 if __name__ == "__main__":
     print "In main"
-    ret = test("/bin/sleep 100")
+    test("/bin/sleep 100")
+#    test("/bin/sleep 10")
