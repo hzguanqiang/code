@@ -14,15 +14,12 @@
 
 #pragma comment(lib, "pdh.lib")
 
-
 CONST PWSTR SYSTEM_HANDLE_COUNT_CPATH = L"\\Process(_Total)\\Handle Count";
 CONST PWSTR SYSTEM_THREAD_COUNT_CPATH = L"\\System\\Threads";
 CONST PWSTR SYSTEM_PROCESS_COUNT_CPATH = L"\\System\\Processes";
 
 CONST PWSTR CPUUSAGE_CPATH = L"\\Processor(_Total)\\% Processor Time";
 CONST PWSTR MEM_AVAIL_CPATH = L"\\Memory\\Available MBytes";
-
-CONST PWSTR DISK_TOTAL_FREE_SPACE_CPATH = L"\\LogicalDisk(_Total)\\% Free Space";  //空间利用率
 
 CONST PWSTR DISK_READ_BPS_CPATH = L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec";
 CONST PWSTR DISK_WRITE_BPS_CPATH = L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec";
@@ -44,7 +41,7 @@ void wmain(int argc, WCHAR **argv)
 
 	HCOUNTER hcSystemHandleCount, hcSystemThreadCount, hcSystemProcessCount;
 	HCOUNTER hcCpuUsage, hcMemAvail;
-	HCOUNTER hcDiskTotalFreeSpace, hcDiskReadBps, hcDiskWriteBps, hcDiskReadIops, hcDiskWriteIops;
+	HCOUNTER hcDiskReadBps, hcDiskWriteBps, hcDiskReadIops, hcDiskWriteIops;
 	HCOUNTER hcNetworkBpsReceived, hcNetworkBpsSent;
 
 	DWORD dwCount;
@@ -72,7 +69,6 @@ void wmain(int argc, WCHAR **argv)
 	PdhAddCounter(hQuery, CPUUSAGE_CPATH, 0, &hcCpuUsage);
 	PdhAddCounter(hQuery, MEM_AVAIL_CPATH, 0, &hcMemAvail);
 
-	PdhAddCounter(hQuery, DISK_TOTAL_FREE_SPACE_CPATH, 0, &hcDiskTotalFreeSpace);
 	PdhAddCounter(hQuery, DISK_READ_BPS_CPATH, 0, &hcDiskReadBps);
 	PdhAddCounter(hQuery, DISK_WRITE_BPS_CPATH, 0, &hcDiskWriteBps);
 	PdhAddCounter(hQuery, DISK_READ_IOPS_CPATH, 0, &hcDiskReadIops);
@@ -81,14 +77,12 @@ void wmain(int argc, WCHAR **argv)
 	PdhAddCounter(hQuery, NETWORK_BPS_RECEIVED_CPATH, 0, &hcNetworkBpsReceived);
 	PdhAddCounter(hQuery, NETWORK_BPS_SENT_CPATH, 0, &hcNetworkBpsSent);
 
-
 	pdhStatus = PdhCollectQueryData(hQuery);
 	PdhGetFormattedCounterValue(hcSystemHandleCount, PDH_FMT_LONG, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcSystemThreadCount, PDH_FMT_LONG, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcSystemProcessCount, PDH_FMT_LONG, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcCpuUsage, PDH_FMT_DOUBLE, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcMemAvail, PDH_FMT_LARGE, NULL, &counterVal);
-	PdhGetFormattedCounterValue(hcDiskTotalFreeSpace, PDH_FMT_DOUBLE, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcDiskReadBps, PDH_FMT_LARGE, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcDiskWriteBps, PDH_FMT_LARGE, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcDiskReadIops, PDH_FMT_LARGE, NULL, &counterVal);
@@ -96,12 +90,9 @@ void wmain(int argc, WCHAR **argv)
 	PdhGetFormattedCounterValue(hcNetworkBpsReceived, PDH_FMT_LARGE, NULL, &counterVal);
 	PdhGetFormattedCounterValue(hcNetworkBpsSent, PDH_FMT_LARGE, NULL, &counterVal);
 
-
 	// Write 10 records to the log file.
 	for (dwCount = 0; dwCount < 100000; dwCount++)
 	{
-		HCOUNTER *hcDiskFreeSpace = NULL;
-		WCHAR DISK_FREE_SPACE_CPATH[100];
 		CHAR buffer[100];
 		int haveDisk = 0;
 		int i = 0;
@@ -141,7 +132,8 @@ void wmain(int argc, WCHAR **argv)
 			// Allocate the buffers and try the call again.
 			pwsLogicalDiskCounterListBuffer = (LPWSTR)malloc(dwLogicalDiskCounterListSize * sizeof(WCHAR));
 			pwsLogicalDiskInstanceListBuffer = (LPWSTR)malloc(dwLogicalDiskInstanceListSize * sizeof(WCHAR));
-			hcDiskFreeSpace = (HCOUNTER *)malloc(dwLogicalDiskInstanceListSize * sizeof(HCOUNTER));
+
+			_ULARGE_INTEGER lpFreeBytesAvailableToCaller, lpTotalNumberOfBytes, lpTotalNumberOfFreeBytes;
 
 			if (NULL != pwsLogicalDiskCounterListBuffer && NULL != pwsLogicalDiskInstanceListBuffer)
 			{
@@ -156,16 +148,13 @@ void wmain(int argc, WCHAR **argv)
 					PERF_DETAIL_WIZARD,     // counter detail level
 					0);
 
-
 				if (pdhStatus == ERROR_SUCCESS)
 				{
 					for (i = 0, pTemp = pwsLogicalDiskInstanceListBuffer; *pTemp != 0; pTemp += wcslen(pTemp) + 1, i++)
 					{
 						if (wcsstr(pTemp, L":") != NULL)
 						{
-							swprintf(DISK_FREE_SPACE_CPATH, 100, L"%s(%s)%s", L"\\LogicalDisk", pTemp, L"\\\% Free Space");
 							haveDisk += 1;
-							PdhAddCounter(hQuery, DISK_FREE_SPACE_CPATH, 0, &(hcDiskFreeSpace[i]));
 						}
 					}
 					Sleep(SAMPLE_INTERVAL_MS);
@@ -185,8 +174,6 @@ void wmain(int argc, WCHAR **argv)
 		{
 			wprintf(L"\nPdhEnumObjectItems failed with 0x%x.\n", pdhStatus);
 		}
-
-
 
 		pdhStatus = PdhCollectQueryData(hQuery);
 
@@ -221,9 +208,6 @@ void wmain(int argc, WCHAR **argv)
 		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 
 		PdhGetFormattedCounterValue(hcMemAvail, PDH_FMT_LARGE, NULL, &counterVal);
-		//sprintf_s(buffer, 100, "\"mem_avail\": \"%u\", ", counterVal.largeValue);
-		//printf("%s", buffer);
-		//fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 		sprintf_s(buffer, 100, "\"mem_used\": \"%u\", ", totalPhysMem - counterVal.largeValue);
 		printf("%s", buffer);
 		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
@@ -231,32 +215,33 @@ void wmain(int argc, WCHAR **argv)
 		printf("%s", buffer);
 		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 
-		sprintf_s(buffer, 100, "\"disk_free_space_rate\": {");
-		printf("%s", buffer);
-		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
-
-		PdhGetFormattedCounterValue(hcDiskTotalFreeSpace, PDH_FMT_DOUBLE, NULL, &counterVal);
-		sprintf_s(buffer, 100, "\"total\": \"%.2f\"", counterVal.doubleValue);
+		sprintf_s(buffer, 100, "\"disk_partition_data\": {");
 		printf("%s", buffer);
 		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 
 		if (haveDisk)
 		{
-			
-			for (i = 0, pTemp = pwsLogicalDiskInstanceListBuffer; *pTemp != 0; pTemp += wcslen(pTemp) + 1, i++)
+			for (i = 0, pTemp = pwsLogicalDiskInstanceListBuffer; *pTemp != 0; pTemp += wcslen(pTemp) + 1)
 			{
 				if (wcsstr(pTemp, L":") != NULL)
 				{
-					printf(", ");
-					fwrite(", ", sizeof(CHAR), strlen(", "), stream);
+					_ULARGE_INTEGER lpFreeBytesAvailableToCaller, lpTotalNumberOfBytes, lpTotalNumberOfFreeBytes;
+					DWORDLONG availDiskSize, totalDiskSize;
 
-					swprintf(DISK_FREE_SPACE_CPATH, 100, L"%s(%s)%s", L"\\LogicalDisk", pTemp, L"\\\% Free Space");
-					PdhGetFormattedCounterValue(hcDiskFreeSpace[i], PDH_FMT_DOUBLE, NULL, &counterVal);
-					sprintf_s(buffer, 100, "\"%s\": \"%.2f\"", pTemp, counterVal.doubleValue);
+					GetDiskFreeSpaceEx(pTemp, &lpFreeBytesAvailableToCaller, &lpTotalNumberOfBytes, &lpTotalNumberOfFreeBytes);
+					availDiskSize = lpFreeBytesAvailableToCaller.QuadPart / (1024 * 1024 * 1024);
+					totalDiskSize = lpTotalNumberOfBytes.QuadPart / (1024 * 1024 * 1024);
+
+					sprintf_s(buffer, 100, "\"%s\": {\"avail_capacity\": \"%llu\", \"total_capacity\": \"%llu\"}", pTemp, availDiskSize, totalDiskSize);
 					printf("%s", buffer);
 					fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 
-					PdhRemoveCounter(hcDiskFreeSpace[i]);
+					i++;
+					if (i != haveDisk)
+					{
+						printf(", ");
+						fwrite(", ", sizeof(CHAR), strlen(", "), stream);
+					}
 				}
 			}
 			sprintf_s(buffer, 100, "}, ");
