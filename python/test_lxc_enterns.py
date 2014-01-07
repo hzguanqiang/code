@@ -6,32 +6,6 @@ import libvirt
 import libvirt_lxc
 
 
-class __redirection__:
-
-    def __init__(self):
-        self.buff = ''
-        self.__console__ = sys.stdout
-
-    def write(self, output_stream):
-        self.buff += output_stream
-
-    def to_console(self):
-        sys.stdout = self.__console__
-        print self.buff
-
-    def to_file(self, file_path):
-        f = open(file_path, 'w')
-        sys.stdout = f
-        print self.buff
-        f.close()
-
-    def flush(self):
-        self.buff = ''
-
-    def reset(self):
-        sys.stdout = self.__console__
-
-
 def _connect_auth_cb(creds, opaque):
     if len(creds) == 0:
         return 0
@@ -56,12 +30,17 @@ def list_all_domains():
 def runcmd(cmd, timeout=2):
     argv = cmd.split()
     try:
+        rp, wp = os.pipe()
         pid = os.fork()
         if pid == 0:
-            sys.stdout = r_obj
+            os.close(rp)
+            wp = os.fdopen(wp, 'w')
+            os.dup2(wp.fileno(), 1)
             os.execv(argv[0], argv)
+            os.close(wp)
             os._exit(255)
         else:
+            os.close(wp)
             last_time = int(time.time())
             cur_time = int(time.time())
             overtime = True
@@ -77,50 +56,36 @@ def runcmd(cmd, timeout=2):
             if overtime:
                 os.kill(pid, signal.SIGKILL)
                 os.waitpid(pid, 0)
+
+            rp = os.fdopen(rp)
+            ret = rp.read()
+            rp.close()
+
+        return ret
 
     except OSError:
         os._exit(255)
 
 
 def exec_lxc_command(domain, cmd, timeout=2, flags=0):
-    print "exec_lxc_command begin"
     ret = None
     try:
+        print "exec_lxc_command begin"
         fdlist = libvirt_lxc.lxcOpenNamespace(domain, flags)
         if fdlist is None:
             return ret
-        pid = os.fork()
-        if pid < 0:
+        if libvirt_lxc.lxcEnterNamespace(domain, fdlist, flags) < 0:
             for fd in fdlist:
                 os.close(fd)
-                return ret
-        elif pid == 0:
-            if libvirt_lxc.lxcEnterNamespace(domain, fdlist, flags) < 0:
-                os._exit(255)
-            runcmd(cmd)
-            os._exit(0)
-        else:
-            for fd in fdlist:
-                os.close(fd)
-
-            last_time = int(time.time())
-            cur_time = int(time.time())
-            overtime = True
-            while cur_time - last_time < timeout:
-                os.waitpid(pid, os.WNOHANG)
-                pidfile = "/proc/%s" % pid
-                if not os.path.exists(pidfile):
-                    overtime = False
-                    break
-                time.sleep(0.1)
-                cur_time = int(time.time())
-
-            if overtime:
-                os.kill(pid, signal.SIGKILL)
-                os.waitpid(pid, 0)
-
-            print "exec_lxc_command end"
             return ret
+
+        ret = runcmd(cmd)
+
+        for fd in fdlist:
+            os.close(fd)
+
+        print "exec_lxc_command end"
+        return ret
     except (libvirt.libvirtError, OSError) as e:
         return None
 
@@ -130,23 +95,8 @@ if __name__ == "__main__":
     print "begin"
     domains = list_all_domains()
 
-    # redirection
-#    r_obj = __redirection__()
-#    sys.stdout = r_obj
-
     for domain in domains:
-        exec_lxc_command(domain, "/bin/df -hl")
-
-    # redirect to console
-#    r_obj.to_console()
-
-    # redirect to file
-    r_obj.to_file('out.log')
-
-    # flush buffer
-#    r_obj.flush()
-
-    # reset
-    r_obj.reset()
+        ret = exec_lxc_command(domain, "/bin/df -hl")
+        print "result : %s " % ret
 
     print "over"
