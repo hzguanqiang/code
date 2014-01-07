@@ -29,8 +29,8 @@ CONST PWSTR DISK_WRITE_IOPS_CPATH = L"\\PhysicalDisk(_Total)\\Disk Writes/sec";
 CONST PWSTR NETWORK_BPS_RECEIVED_CPATH = L"\\Network Interface(*)\\Bytes Received/sec";
 CONST PWSTR NETWORK_BPS_SENT_CPATH = L"\\Network Interface(*)\\Bytes Sent/sec";
 
-//CONST ULONG SAMPLE_INTERVAL_MS = 10000;
-CONST ULONG SAMPLE_INTERVAL_MS = 1000;
+CONST ULONG SAMPLE_INTERVAL_MS = 10000;
+//CONST ULONG SAMPLE_INTERVAL_MS = 1000;
 //CONST PSTR PERF_FILE = "c:\\windows\\qemu-ga\\perf.txt";
 CONST PSTR PERF_FILE = "perf.txt";
 
@@ -244,10 +244,59 @@ void wmain(int argc, WCHAR **argv)
 					}
 				}
 			}
-			sprintf_s(buffer, 100, "}, ");
+		}
+		sprintf_s(buffer, 100, "}, ");
+		printf("%s", buffer);
+		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
+
+		sprintf_s(buffer, 100, "\"disk_partition_info\": {");
+		printf("%s", buffer);
+		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
+		if (haveDisk)
+		{
+			sprintf_s(buffer, 100, "\"sys\": [");
+			printf("%s", buffer);
+			fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
+			for (i = 0, pTemp = pwsLogicalDiskInstanceListBuffer; *pTemp != 0; pTemp += wcslen(pTemp) + 1)
+			{
+				if (wcsstr(pTemp, L"C:") != NULL)
+				{
+					sprintf_s(buffer, 100, "\"%s\", ", pTemp);
+					printf("%s", buffer);
+					fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+				}
+			}
+			sprintf_s(buffer, 100, "], ");
+			printf("%s", buffer);
+			fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
+			sprintf_s(buffer, 100, "\"logic\": [");
+			printf("%s", buffer);
+			fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
+			for (i = 0, pTemp = pwsLogicalDiskInstanceListBuffer; *pTemp != 0; pTemp += wcslen(pTemp) + 1)
+			{
+				if (wcsstr(pTemp, L":") != NULL)
+				{
+					if (wcsstr(pTemp, L"C:") != NULL)
+						continue;
+					sprintf_s(buffer, 100, "\"%s\", ", pTemp);
+					printf("%s", buffer);
+					fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+				}
+			}
+			sprintf_s(buffer, 100, "], ");
 			printf("%s", buffer);
 			fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
 		}
+
+		sprintf_s(buffer, 100, "}, ");
+		printf("%s", buffer);
+		fwrite(buffer, sizeof(CHAR), strlen(buffer), stream);
+
 
 		PdhGetFormattedCounterValue(hcDiskReadBps, PDH_FMT_LARGE, NULL, &counterVal);
 		sprintf_s(buffer, 100, "\"disk_read_bps\": \"%u\", ", counterVal.largeValue);
@@ -290,7 +339,7 @@ void wmain(int argc, WCHAR **argv)
 		if (pwsLogicalDiskInstanceListBuffer != NULL)
 			free(pwsLogicalDiskInstanceListBuffer);
 
-		break;
+		//break;
 	}
 
 cleanup:
