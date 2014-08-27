@@ -1,0 +1,13 @@
+To make a lxc image for yourself, following the steps below:
+
+1) bash lxc-start.sh
+To excute this command, you will make a base lxc image and start a lxc instance.
+The default username/password is root/aaaa set in the script.
+
+2) After the first step, you can enter into a lxc instance.
+Then you can input the default username and password to login the lxc.
+After login, you can configure your own software.
+
+3) bash lxc-finish.sh
+After you configure your own software in lxc, please exucute this command to
+terminate the lxc instance and create an qcow2 lxc image for you. 

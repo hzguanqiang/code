@@ -1,0 +1,65 @@
+
+
+--------------------------------------脚本说明-----------------------------------------------------
+* 这个脚本适合在虚拟机中使用。
+* 为了清晰起见，每个包用到的时候才会安装
+* 网桥通过-w选项可以选择手工配置或自动配置
+* 镜像以密码形式登陆，不支持公钥(在传入nvs系统之后会支持)
+* 安装包和输入密码可以用expect自动完成，需要引入脚本，所以没这么做；中间需要手工干预来输入密码
+* 不使用qemu-nbd来挂载设备，直接使用raw格式的文件挂载
+* 最后的输出是压缩过的qcow2形式的镜像，存放路径为/lxc/$NAME/lxc_image_final.qcow2
+
+
+--------------------------------------如何运行----------------------------------------------------
+
+* 第一次运行必须手工配置grub
+  在文件 /etc/default/grub 中加入一行 GRUB_CMDLINE_LINUX="cgroup_enable=memory"
+  运行命令 update-grub2
+  重启机器 reboot
+* 第一次运行需要进行相关配置
+    ./lxc-prepare.sh -h
+* 如果是第一次运行，安装包时会提示输入yes，每次安装完成会提示输入lxc虚拟机密码
+
+
+--------------------------------------如何启动虚拟机及配置网络-----------------------------------------------------
+* 开启lxc虚拟机
+  root@localhost:/rootfs# lxc-start -n  rootfs  -f /lxc/example10/config
+  
+* 宿主机所在的虚拟机的网络配置如下：
+root@localhost:~# ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether fa:16:3e:0c:d6:ea brd ff:ff:ff:ff:ff:ff
+    inet 10.160.30.97/23 brd 10.160.31.255 scope global eth0
+    inet6 fe80::f816:3eff:fe0c:d6ea/64 scope link tentative dadfailed
+       valid_lft forever preferred_lft forever
+root@localhost:~# ip addr show br100
+5: br100: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP
+    link/ether fa:16:3e:0c:d6:ea brd ff:ff:ff:ff:ff:ff
+    inet 192.168.2.77/24 brd 192.168.2.255 scope global br100
+    inet6 fe80::f816:3eff:fe0c:d6ea/64 scope link tentative dadfailed
+       valid_lft forever preferred_lft forever
+       
+* 宿主机下配置nat规则
+  root@localhost:~# iptables -t nat  -A POSTROUTING -s 192.168.2.0/24 -o eth0 -j MASQUERADE 
+ 
+* 给lxc虚拟机配置IP和网关
+  root@example10:~# ifconfig eth0 192.168.2.211
+  root@example10:~# ip route add default via 192.168.2.77 dev eth0
+  
+  网络即可连通
+  root@example10:~# ping -c 1  163.com
+  PING 163.com (123.58.180.8): 48 data bytes
+  56 bytes from 123.58.180.8: icmp_seq=0 ttl=61 time=0.599 ms
+  --- 163.com ping statistics ---
+  1 packets transmitted, 1 packets received, 0% packet loss
+  round-trip min/avg/max/stddev = 0.599/0.599/0.599/0.000 ms
+
+ * 关闭lxc虚拟机
+  root@localhost:/rootfs# lxc-stop -n  rootfs
+  
+  
+  
+  
+
+
+ 
