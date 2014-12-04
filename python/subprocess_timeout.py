@@ -20,7 +20,6 @@ def run(command, timeout=10):
 
     if proc.poll() == None:
         if float(sys.version[:3]) >= 2.6:
-            import pdb; pdb.set_trace() ### XXX BREAKPOINT
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             proc.terminate()
@@ -34,4 +33,8 @@ def run(command, timeout=10):
 if __name__ == "__main__":
 #    print run(["ls", "-l"])
 #    print run(["find", "/"], timeout=3) #should timeout
-    print run(["sudo", "ping", "www.baidu.com"], timeout=3)
+#    print run(["sudo", "ping", "www.baidu.com"], timeout=3)
+    cmd = ("sudo virsh -c lxc:/// lxc-enter-namespace --noseclabel"
+           " instance-0000093d /bin/sleep 100")
+
+    print run(cmd.split(), timeout=3)
